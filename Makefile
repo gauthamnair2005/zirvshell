@@ -1,8 +1,6 @@
 CC      := x86_64-elf-gcc
 LD      := x86_64-elf-ld
-OBJCOPY := x86_64-elf-objcopy
 
-# Fall back to system toolchain if cross-compiler is missing
 ifeq (, $(shell which $(CC) 2>/dev/null))
   CC := gcc
   LD := ld
@@ -14,8 +12,8 @@ CFLAGS := \
     -fno-stack-protector \
     -fno-pic \
     -mno-red-zone \
+    -mno-mmx -mno-sse -mno-sse2 \
     -Wall -Wextra -O2 \
-    -Iinclude \
     -I../libs/zirvlibc/include
 
 LDFLAGS := \
@@ -24,25 +22,27 @@ LDFLAGS := \
     -no-pie \
     -z max-page-size=0x1000
 
-# MOSIX init must be statically linked against zirvlibc
-LIBC_OBJS := \
-    ../build/libs/zirvlibc/src/string.o \
-    ../libs/zirvlibc/src/stdio_user.o \
-    ../libs/zirvlibc/src/unistd_user.o \
-    ../libs/zirvlibc/src/syscall_user.o \
-    ../build/libs/zirvlibc/src/ctype.o
+LIBC_SRCS := \
+    ../libs/zirvlibc/src/string.c \
+    ../libs/zirvlibc/src/ctype.c \
+    ../libs/zirvlibc/src/stdio.c \
+    ../libs/zirvlibc/src/unistd.c \
+    ../libs/zirvlibc/src/syscall.c
+
+LIBC_BUILD := ../build/zirvshell-libc
+LIBC_OBJS := $(patsubst ../libs/zirvlibc/src/%.c,$(LIBC_BUILD)/%.o,$(LIBC_SRCS))
 
 SRCS := src/main.c src/crt0.asm
 OBJS := src/main.o src/crt0.o
 
-TARGET := zirvinit.elf
+TARGET := zirvshell.elf
 
 .PHONY: all clean
 
 all: $(TARGET)
 
-$(TARGET): $(OBJS)
-	$(LD) $(LDFLAGS) -o $@ $^ $(LIBC_OBJS)
+$(TARGET): $(OBJS) $(LIBC_OBJS)
+	$(LD) $(LDFLAGS) -o $@ $^
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -50,5 +50,10 @@ $(TARGET): $(OBJS)
 %.o: %.asm
 	nasm -f elf64 -o $@ $<
 
+$(LIBC_BUILD)/%.o: ../libs/zirvlibc/src/%.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 clean:
 	rm -f $(TARGET) $(OBJS)
+	rm -rf $(LIBC_BUILD)
