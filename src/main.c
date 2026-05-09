@@ -2,6 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <dirent.h>
 #include <zirv/syscall.h>
 
 #define MAX_CMD_LEN 256
@@ -82,6 +83,7 @@ static int cmd_help(void)
     printf("  show system status    Show system info\n");
     printf("  go to <path>          Change directory\n");
     printf("  date                  Print the system date/time\n");
+    printf("  settime <date> <time> Set system date/time (YYYY-MM-DD HH:MM:SS)\n");
     printf("  uptime                Print system uptime\n");
     printf("  reboot                Reboot the system\n");
     printf("  exit                  Exit the shell\n");
@@ -127,8 +129,27 @@ static int cmd_uname(void)
 
 static int cmd_ls(void)
 {
-    printf("/bin/   System binaries\n");
-    printf("/zirv/  Device namespace\n");
+    char cwd[256];
+    if (getcwd(cwd, sizeof(cwd)) <= 0) return -1;
+
+    int fd = open(cwd, 0);
+    if (fd < 0) {
+        printf("ls: cannot open '%s'\n", cwd);
+        return -1;
+    }
+
+    struct dirent ents[32];
+    int n = getdents(fd, ents, 32);
+    close(fd);
+
+    if (n < 0) {
+        printf("ls: error reading directory\n");
+        return -1;
+    }
+
+    for (int i = 0; i < n; i++) {
+        printf("  %s\n", ents[i].d_name);
+    }
     return 0;
 }
 
@@ -142,15 +163,92 @@ static int cmd_cat(int argc, char *argv[])
     return 0;
 }
 
+static const char *day_name(int d)
+{
+    static const char *names[7] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+    if (d < 0 || d > 6) return "???";
+    return names[d];
+}
+
 static int cmd_date(void)
 {
-    printf("date: not available\n");
+    struct datetime dt;
+    if (getdatetime(&dt) < 0) {
+        printf("date: unable to read system time\n");
+        return -1;
+    }
+    printf("%s %04d-%02d-%02d %02d:%02d:%02d\n",
+           day_name(0),  /* day of week not tracked; always show as day 0 for now */
+           dt.year, dt.month, dt.day,
+           dt.hour, dt.minute, dt.second);
+    return 0;
+}
+
+static int parse_int(const char **p)
+{
+    int val = 0;
+    while (**p >= '0' && **p <= '9') {
+        val = val * 10 + (**p - '0');
+        (*p)++;
+    }
+    return val;
+}
+
+static int cmd_settime(int argc, char *argv[])
+{
+    if (argc < 3) {
+        printf("Usage: settime YYYY-MM-DD HH:MM:SS\n");
+        return -1;
+    }
+    struct datetime dt;
+    const char *p = argv[1];
+    dt.year = parse_int(&p);
+    if (*p != '-') { printf("settime: invalid date format (use YYYY-MM-DD)\n"); return -1; }
+    p++;
+    dt.month = parse_int(&p);
+    if (*p != '-') { printf("settime: invalid date format (use YYYY-MM-DD)\n"); return -1; }
+    p++;
+    dt.day = parse_int(&p);
+    if (*p != '\0') { printf("settime: invalid date format (use YYYY-MM-DD)\n"); return -1; }
+
+    p = argv[2];
+    dt.hour = parse_int(&p);
+    if (*p != ':') { printf("settime: invalid time format (use HH:MM:SS)\n"); return -1; }
+    p++;
+    dt.minute = parse_int(&p);
+    if (*p != ':') { printf("settime: invalid time format (use HH:MM:SS)\n"); return -1; }
+    p++;
+    dt.second = parse_int(&p);
+    if (*p != '\0') { printf("settime: invalid time format (use HH:MM:SS)\n"); return -1; }
+
+    if (setdatetime(&dt) < 0) {
+        printf("settime: failed to set system time\n");
+        return -1;
+    }
+    printf("System time set.\n");
     return 0;
 }
 
 static int cmd_uptime(void)
 {
-    printf("uptime: not available\n");
+    uint64_t secs = uptime();
+    uint64_t days  = secs / 86400;
+    secs %= 86400;
+    uint64_t hours = secs / 3600;
+    secs %= 3600;
+    uint64_t mins  = secs / 60;
+    secs %= 60;
+    if (days > 0)
+        printf("%llu days, %02llu:%02llu:%02llu\n",
+               (unsigned long long)days,
+               (unsigned long long)hours,
+               (unsigned long long)mins,
+               (unsigned long long)secs);
+    else
+        printf("%02llu:%02llu:%02llu\n",
+               (unsigned long long)hours,
+               (unsigned long long)mins,
+               (unsigned long long)secs);
     return 0;
 }
 
@@ -167,9 +265,24 @@ static int cmd_show(int argc, char *argv[])
         return -1;
     }
     if (strcmp(argv[1], "files") == 0) {
-        printf("Directory listing:\n");
-        printf("  /bin/    - System binaries\n");
-        printf("  /zirv/   - Device namespace\n");
+        char cwd[256];
+        if (getcwd(cwd, sizeof(cwd)) <= 0) return -1;
+        int fd = open(cwd, 0);
+        if (fd < 0) {
+            printf("show: cannot open '%s'\n", cwd);
+            return -1;
+        }
+        struct dirent ents[32];
+        int n = getdents(fd, ents, 32);
+        close(fd);
+        if (n < 0) {
+            printf("show: error reading directory\n");
+            return -1;
+        }
+        printf("Directory listing for %s:\n", cwd);
+        for (int i = 0; i < n; i++) {
+            printf("  %s\n", ents[i].d_name);
+        }
     } else if (argc >= 3 && strcmp(argv[1], "system") == 0
                          && strcmp(argv[2], "status") == 0) {
         int pid = getpid();
@@ -256,6 +369,8 @@ int main(void)
             cmd_cat(argc, argv);
         } else if (strcmp(argv[0], "date") == 0) {
             cmd_date();
+        } else if (strcmp(argv[0], "settime") == 0) {
+            cmd_settime(argc, argv);
         } else if (strcmp(argv[0], "uptime") == 0) {
             cmd_uptime();
         } else if (strcmp(argv[0], "reboot") == 0) {

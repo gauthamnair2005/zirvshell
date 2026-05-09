@@ -27,7 +27,8 @@ LIBC_SRCS := \
     ../libs/zirvlibc/src/ctype.c \
     ../libs/zirvlibc/src/stdio.c \
     ../libs/zirvlibc/src/unistd.c \
-    ../libs/zirvlibc/src/syscall.c
+    ../libs/zirvlibc/src/syscall.c \
+    ../libs/zirvlibc/src/datetime.c
 
 LIBC_BUILD := ../build/zirvshell-libc
 LIBC_OBJS := $(patsubst ../libs/zirvlibc/src/%.c,$(LIBC_BUILD)/%.o,$(LIBC_SRCS))
