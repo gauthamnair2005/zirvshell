@@ -258,25 +258,25 @@ static int cmd_timezone(int argc, char *argv[])
         printf("UTC%c%02d:%02d\n", sign, abs / 60, abs % 60);
         return 0;
     }
-    const char *p = argv[1];
-    int sign = 1, tz = 0;
+    const char *raw = argv[1];
+    const char *p = raw;
+    int sign = 1;
     if (*p == '+') { sign = 1; p++; }
     else if (*p == '-') { sign = -1; p++; }
-    tz = 0;
-    while (*p >= '0' && *p <= '9') { tz = tz * 10 + (*p - '0'); p++; }
+    int hours = 0;
+    while (*p >= '0' && *p <= '9') { hours = hours * 10 + (*p - '0'); p++; }
+    int mins = 0;
     if (*p == ':') {
         p++;
-        int mins = 0;
         while (*p >= '0' && *p <= '9') { mins = mins * 10 + (*p - '0'); p++; }
-        tz = tz * 60 + mins;
-    } else {
-        tz = tz * 60;
     }
-    if (settz(tz * sign) < 0) {
+    int tz = (hours * 60 + mins) * sign;
+    if (settz(tz) < 0) {
         printf("timezone: failed to set\n");
         return -1;
     }
-    printf("Timezone set.\n");
+    printf("Parsed '%s' -> %s%02d:%02d (%d min). Timezone set.\n",
+           raw, sign < 0 ? "-" : "+", hours, mins, tz);
     return 0;
 }
 
