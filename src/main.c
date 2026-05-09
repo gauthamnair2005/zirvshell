@@ -85,6 +85,7 @@ static int cmd_help(void)
     printf("  date                  Print the system date/time\n");
     printf("  settime <date> <time> Set system date/time (YYYY-MM-DD HH:MM:SS)\n");
     printf("  uptime                Print system uptime\n");
+    printf("  timezone [UTC+/-H:MM]  Show or set timezone\n");
     printf("  reboot                Reboot the system\n");
     printf("  exit                  Exit the shell\n");
     return 0;
@@ -177,10 +178,14 @@ static int cmd_date(void)
         printf("date: unable to read system time\n");
         return -1;
     }
-    printf("%s %04d-%02d-%02d %02d:%02d:%02d\n",
-           day_name(0),  /* day of week not tracked; always show as day 0 for now */
+    int tz = gettz();
+    char tz_sign = (tz >= 0) ? '+' : '-';
+    int tz_abs = (tz >= 0) ? tz : -tz;
+    printf("%s %04d-%02d-%02d %02d:%02d:%02d UTC%c%02d:%02d\n",
+           day_name(0),
            dt.year, dt.month, dt.day,
-           dt.hour, dt.minute, dt.second);
+           dt.hour, dt.minute, dt.second,
+           tz_sign, tz_abs / 60, tz_abs % 60);
     return 0;
 }
 
@@ -232,23 +237,46 @@ static int cmd_settime(int argc, char *argv[])
 static int cmd_uptime(void)
 {
     uint64_t secs = uptime();
-    uint64_t days  = secs / 86400;
-    secs %= 86400;
-    uint64_t hours = secs / 3600;
-    secs %= 3600;
-    uint64_t mins  = secs / 60;
-    secs %= 60;
+    unsigned long days  = (unsigned long)(secs / 86400); secs %= 86400;
+    unsigned long hours = (unsigned long)(secs / 3600);  secs %= 3600;
+    unsigned long mins  = (unsigned long)(secs / 60);    secs %= 60;
     if (days > 0)
-        printf("%llu days, %02llu:%02llu:%02llu\n",
-               (unsigned long long)days,
-               (unsigned long long)hours,
-               (unsigned long long)mins,
-               (unsigned long long)secs);
+        printf("%lu days, %02lu:%02lu:%02lu\n",
+               days, hours, mins, (unsigned long)secs);
     else
-        printf("%02llu:%02llu:%02llu\n",
-               (unsigned long long)hours,
-               (unsigned long long)mins,
-               (unsigned long long)secs);
+        printf("%02lu:%02lu:%02lu\n",
+               hours, mins, (unsigned long)secs);
+    return 0;
+}
+
+static int cmd_timezone(int argc, char *argv[])
+{
+    if (argc < 2) {
+        int tz = gettz();
+        char sign = (tz >= 0) ? '+' : '-';
+        int abs = (tz >= 0) ? tz : -tz;
+        printf("UTC%c%02d:%02d\n", sign, abs / 60, abs % 60);
+        return 0;
+    }
+    const char *p = argv[1];
+    int sign = 1, tz = 0;
+    if (*p == '+') { sign = 1; p++; }
+    else if (*p == '-') { sign = -1; p++; }
+    tz = 0;
+    while (*p >= '0' && *p <= '9') { tz = tz * 10 + (*p - '0'); p++; }
+    if (*p == ':') {
+        p++;
+        int mins = 0;
+        while (*p >= '0' && *p <= '9') { mins = mins * 10 + (*p - '0'); p++; }
+        tz = tz * 60 + mins;
+    } else {
+        tz = tz * 60;
+    }
+    if (settz(tz * sign) < 0) {
+        printf("timezone: failed to set\n");
+        return -1;
+    }
+    printf("Timezone set.\n");
     return 0;
 }
 
@@ -373,6 +401,8 @@ int main(void)
             cmd_settime(argc, argv);
         } else if (strcmp(argv[0], "uptime") == 0) {
             cmd_uptime();
+        } else if (strcmp(argv[0], "timezone") == 0) {
+            cmd_timezone(argc, argv);
         } else if (strcmp(argv[0], "reboot") == 0) {
             cmd_reboot();
         } else if (strcmp(argv[0], "show") == 0) {
