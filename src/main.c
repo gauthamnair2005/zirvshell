@@ -282,8 +282,22 @@ static int cmd_timezone(int argc, char *argv[])
 
 static int cmd_reboot(void)
 {
-    printf("reboot: not available\n");
+    printf("Rebooting...\n");
+    reboot();
     return 0;
+}
+
+static int cmd_shutdown(void)
+{
+    printf("Shutting down...\n");
+    shutdown();
+    return 0;
+}
+
+static int cmd_suspend(void)
+{
+    printf("Suspend: not supported on this hardware\n");
+    return 1;
 }
 
 static int cmd_show(int argc, char *argv[])
@@ -405,6 +419,10 @@ int main(void)
             cmd_timezone(argc, argv);
         } else if (strcmp(argv[0], "reboot") == 0) {
             cmd_reboot();
+        } else if (strcmp(argv[0], "shutdown") == 0 || strcmp(argv[0], "poweroff") == 0) {
+            cmd_shutdown();
+        } else if (strcmp(argv[0], "suspend") == 0) {
+            cmd_suspend();
         } else if (strcmp(argv[0], "show") == 0) {
             cmd_show(argc, argv);
         } else if (strcmp(argv[0], "go") == 0 || strcmp(argv[0], "cd") == 0) {
