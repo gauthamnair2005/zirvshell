@@ -26,6 +26,7 @@ LIBC_SRCS := \
     ../libs/zirvlibc/src/string.c \
     ../libs/zirvlibc/src/ctype.c \
     ../libs/zirvlibc/src/stdio.c \
+    ../libs/zirvlibc/src/stdlib.c \
     ../libs/zirvlibc/src/unistd.c \
     ../libs/zirvlibc/src/syscall.c \
     ../libs/zirvlibc/src/datetime.c
