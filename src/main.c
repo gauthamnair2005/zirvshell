@@ -645,20 +645,20 @@ int main(void)
             cmd_mv(argc, argv);
         } else if (strcmp(argv[0], "cp") == 0) {
             cmd_copy(argc, argv);
-        } else if (strcmp(argv[0], "ping") == 0) {
+        } else {
+            /* Look up the command in /bin/<name> automatically */
+            char binpath[256];
+            snprintf(binpath, sizeof(binpath), "/bin/%s", argv[0]);
+            /* Reuse argv but point argv[0] at the binpath so the program
+             * sees its own canonical path (conventional). */
             char *exec_argv[MAX_ARGS];
-            exec_argv[0] = "/bin/ping";
+            exec_argv[0] = binpath;
             for (int i = 1; i < argc && i < MAX_ARGS - 1; i++)
                 exec_argv[i] = argv[i];
             exec_argv[argc] = NULL;
-            execve("/bin/ping", exec_argv, NULL);
-            printf("ping: failed to execute\n");
-        } else if (strcmp(argv[0], "ifconfig") == 0) {
-            char *exec_argv[] = {"/bin/ifconfig", NULL};
-            execve("/bin/ifconfig", exec_argv, NULL);
-            printf("ifconfig: failed to execute\n");
-        } else {
-            printf("ZirvShell: '%s': unknown command. Type 'help'.\n", argv[0]);
+            execve(binpath, exec_argv, NULL);
+            /* execve only returns on failure */
+            printf("ZirvShell: '%s': command not found. Type 'help'.\n", argv[0]);
         }
     }
 
