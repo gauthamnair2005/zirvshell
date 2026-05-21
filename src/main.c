@@ -98,6 +98,10 @@ static void print_help_header(void)
     printf("    whoami                           Show current user\n");
     printf("    show system status               Show system info\n");
     printf("\n");
+    printf("  NETWORKING\n");
+    printf("    ping [<ip>]                      Ping a host (default: 10.0.2.2)\n");
+    printf("    ifconfig                         Show network interfaces\n");
+    printf("\n");
     printf("  EXECUTION\n");
     printf("    echo / say <text>                Print text\n");
     printf("    run / exec <binary>              Execute a program\n");
@@ -641,6 +645,18 @@ int main(void)
             cmd_mv(argc, argv);
         } else if (strcmp(argv[0], "cp") == 0) {
             cmd_copy(argc, argv);
+        } else if (strcmp(argv[0], "ping") == 0) {
+            char *exec_argv[MAX_ARGS];
+            exec_argv[0] = "/bin/ping";
+            for (int i = 1; i < argc && i < MAX_ARGS - 1; i++)
+                exec_argv[i] = argv[i];
+            exec_argv[argc] = NULL;
+            execve("/bin/ping", exec_argv, NULL);
+            printf("ping: failed to execute\n");
+        } else if (strcmp(argv[0], "ifconfig") == 0) {
+            char *exec_argv[] = {"/bin/ifconfig", NULL};
+            execve("/bin/ifconfig", exec_argv, NULL);
+            printf("ifconfig: failed to execute\n");
         } else {
             printf("ZirvShell: '%s': unknown command. Type 'help'.\n", argv[0]);
         }
