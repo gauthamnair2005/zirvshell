@@ -4,17 +4,12 @@ global _start
 extern main
 
 _start:
-    ; The kernel should have set up a stack for us
-    ; and passed any arguments in rdi, rsi, etc.
-    
+    mov  rdi, [rsp]       ; argc (pushed by kernel)
+    lea  rsi, [rsp + 8]   ; argv
     call main
-
-    ; If main returns, we exit
-    mov rax, 60         ; SYS_EXIT
-    xor rdi, rdi        ; status 0
+    mov  rax, 60          ; SYS_EXIT
+    xor  rdi, rdi
     syscall
-
-    ; Should never reach here
 .halt:
     hlt
     jmp .halt
