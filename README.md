@@ -1,27 +1,41 @@
-# zirvshell — MOSIX Interactive Shell
+# zirvshell — MOSIX Interactive Shell (Reference Shell)
 
-Command-line shell for the Zirvium kernel. Supports MOSIX English-like syntax alongside standard POSIX command names.
+Command-line shell for **MOSIX** operating systems. Supports English-like
+natural language syntax alongside standard POSIX command names.
 
-## Commands
+Part of the [Zirvium](https://github.com/gauthamnair2005/zirvium) reference
+MOSIX implementation. See the [MOSIX specification](https://github.com/gauthamnair2005/zirvworld)
+for the full standard.
 
-| Command | Description |
-|---------|-------------|
-| `help` | Show help text |
-| `echo`, `say` | Print text |
-| `pwd`, `where` | Print working directory |
-| `uname` | Print kernel name |
-| `whoami` | Show current user |
-| `clear` | Clear the screen |
-| `ls`, `list` | List directory contents (stub) |
-| `cat`, `display` | Display file contents (stub) |
-| `run`, `exec` | Execute an embedded binary |
-| `show files` | List directory |
-| `show system status` | Show system info |
-| `go to`, `cd` | Change directory |
-| `date` | Print system date/time (stub) |
-| `uptime` | Print system uptime (stub) |
-| `reboot` | Reboot (stub) |
-| `exit` | Exit the shell |
+## Commands (19 total)
+
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `help` | `help me please` | Show help text |
+| `echo` | `say` | Print text |
+| `pwd` | `where` | Print working directory |
+| `uname` | | Print kernel name |
+| `whoami` | | Show current user |
+| `clear` | `clear the screen` | Clear screen |
+| `ls` | `list`, `show files` | Directory listing via `getdents` |
+| `cat` | `display` | Display file contents |
+| `run` | `exec` | Execute a binary via `execve` |
+| `go to` | `cd` | Change directory |
+| `date` | | Print date/time |
+| `settime` | | Set date/time |
+| `timezone` | | Show/set timezone |
+| `uptime` | | System uptime |
+| `reboot` | | Reboot via SYS_REBOOT |
+| `shutdown` | `poweroff` | Shutdown via SYS_SHUTDOWN |
+| `suspend` | | Suspend (stub) |
+| `exit` | | Exit shell |
+
+## Features
+
+- CWD-aware prompt (`/ $`)
+- Line editor with backspace
+- Double-quoted argument parsing
+- Multi-word natural language: `help me please`, `clear the screen`
 
 ## Build
 
@@ -29,4 +43,5 @@ Command-line shell for the Zirvium kernel. Supports MOSIX English-like syntax al
 make
 ```
 
-Produces `zirvshell.elf` — a statically linked, freestanding, no-pie ELF binary embedded into the kernel at `/bin/shell`.
+Produces `zirvshell.elf` — static, freestanding, no-pie ELF64.
+Linked against [zirvlibc](https://github.com/gauthamnair2005/zirvlibc).
