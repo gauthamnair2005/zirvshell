@@ -386,10 +386,11 @@ static int cmd_run(int argc, char *argv[])
     printf("ZirvShell: execute '%s' as PID %d...\n", argv[1], pid);
 
     char *exec_argv[] = { argv[1], NULL };
-    execve(argv[1], exec_argv, NULL);
+    int _exec_rc = execve(argv[1], exec_argv, NULL);
 
-    printf("execve: %s: command not found\n", argv[1]);
-    return -1;
+    if (_exec_rc < 0)
+        printf("execve: %s: command not found\n", argv[1]);
+    return _exec_rc >= 0 ? 0 : -1;
 }
 
 /* ── MOSIX English: create ───────────────────────────────────────────────── */
@@ -656,9 +657,9 @@ int main(void)
             for (int i = 1; i < argc && i < MAX_ARGS - 1; i++)
                 exec_argv[i] = argv[i];
             exec_argv[argc] = NULL;
-            execve(binpath, exec_argv, NULL);
-            /* execve only returns on failure */
-            printf("ZirvShell: '%s': command not found. Type 'help'.\n", argv[0]);
+            int _exec_rc = execve(binpath, exec_argv, NULL);
+            if (_exec_rc < 0)
+                printf("ZirvShell: '%s': command not found. Type 'help'.\n", argv[0]);
         }
     }
 
