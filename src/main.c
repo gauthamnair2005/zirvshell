@@ -12,9 +12,9 @@ static void print_prompt(void)
 {
     char cwd[256];
     if (getcwd(cwd, sizeof(cwd)) > 0) {
-        printf("%s $ ", cwd);
+        printf("%s \xE2\x82\xB9 ", cwd);
     } else {
-        printf("$ ");
+        printf("\xE2\x82\xB9 ");
     }
 }
 
@@ -66,28 +66,51 @@ static int parse_args(char *cmd, char *argv[], int max_args)
     return argc;
 }
 
-static int cmd_help(void)
+static void print_help_header(void)
 {
     printf("ZirvShell MOSIX Commands:\n");
-    printf("  help                  Show this help\n");
-    printf("  echo <text>           Print text\n");
-    printf("  pwd                   Print working directory\n");
-    printf("  uname                 Print system information\n");
-    printf("  whoami                Show current user\n");
-    printf("  clear                 Clear the screen\n");
-    printf("  ls                    List directory contents\n");
-    printf("  cat <file>            Display file contents\n");
-    printf("  run <binary>          Execute a program\n");
-    printf("  exec <binary>         Execute a program (replaces shell)\n");
-    printf("  show files            List directory\n");
-    printf("  show system status    Show system info\n");
-    printf("  go to <path>          Change directory\n");
-    printf("  date                  Print the system date/time\n");
-    printf("  settime <date> <time> Set system date/time (YYYY-MM-DD HH:MM:SS)\n");
-    printf("  uptime                Print system uptime\n");
-    printf("  timezone [UTC+/-H:MM]  Show or set timezone\n");
-    printf("  reboot                Reboot the system\n");
-    printf("  exit                  Exit the shell\n");
+    printf("  HELP (General)\n");
+    printf("    help / help me please           Show this help\n");
+    printf("    clear / clear the screen        Clear the screen\n");
+    printf("    exit                             Exit the shell\n");
+    printf("\n");
+    printf("  FILE OPERATIONS (English / POSIX)\n");
+    printf("    create file <path>              Create an empty file\n");
+    printf("    create folder / mkdir <path>    Create a directory\n");
+    printf("    delete file / rm / unlink <p>   Delete a file\n");
+    printf("    delete folder / rmdir <path>    Delete an empty directory\n");
+    printf("    rename / mv <old> <new>         Rename a file or directory\n");
+    printf("    copy / cp <src> <dst>           Copy a file\n");
+    printf("    cat / display <file>            Display file contents\n");
+    printf("    ls / list                       List directory contents\n");
+    printf("    show files                      List directory (long form)\n");
+    printf("\n");
+    printf("  NAVIGATION\n");
+    printf("    go to / cd <path>               Change directory\n");
+    printf("    pwd / where                     Print working directory\n");
+    printf("\n");
+    printf("  SYSTEM INFO\n");
+    printf("    date                             Print system date/time\n");
+    printf("    settime <date> <time>            Set date/time (YYYY-MM-DD HH:MM:SS)\n");
+    printf("    uptime                           Print system uptime\n");
+    printf("    timezone [UTC+/-H:MM]            Show or set timezone\n");
+    printf("    uname                            Print system information\n");
+    printf("    whoami                           Show current user\n");
+    printf("    show system status               Show system info\n");
+    printf("\n");
+    printf("  EXECUTION\n");
+    printf("    echo / say <text>                Print text\n");
+    printf("    run / exec <binary>              Execute a program\n");
+    printf("\n");
+    printf("  POWER\n");
+    printf("    reboot                           Reboot the system\n");
+    printf("    shutdown / poweroff              Shut down the system\n");
+    printf("    suspend                          Suspend the system\n");
+}
+
+static int cmd_help(void)
+{
+    print_help_header();
     return 0;
 }
 
@@ -128,14 +151,18 @@ static int cmd_uname(void)
     return 0;
 }
 
-static int cmd_ls(void)
+static int cmd_ls(int argc, char *argv[])
 {
-    char cwd[256];
-    if (getcwd(cwd, sizeof(cwd)) <= 0) return -1;
+    const char *dir = (argc > 1) ? argv[1] : NULL;
+    char buf[256];
+    if (!dir) {
+        if (getcwd(buf, sizeof(buf)) <= 0) return -1;
+        dir = buf;
+    }
 
-    int fd = open(cwd, 0);
+    int fd = open(dir, 0);
     if (fd < 0) {
-        printf("ls: cannot open '%s'\n", cwd);
+        printf("ls: cannot open '%s'\n", dir);
         return -1;
     }
 
@@ -300,6 +327,7 @@ static int cmd_suspend(void)
     return 1;
 }
 
+/* ── MOSIX English: show ─────────────────────────────────────────────────── */
 static int cmd_show(int argc, char *argv[])
 {
     if (argc < 2) {
@@ -307,24 +335,7 @@ static int cmd_show(int argc, char *argv[])
         return -1;
     }
     if (strcmp(argv[1], "files") == 0) {
-        char cwd[256];
-        if (getcwd(cwd, sizeof(cwd)) <= 0) return -1;
-        int fd = open(cwd, 0);
-        if (fd < 0) {
-            printf("show: cannot open '%s'\n", cwd);
-            return -1;
-        }
-        struct dirent ents[32];
-        int n = getdents(fd, ents, 32);
-        close(fd);
-        if (n < 0) {
-            printf("show: error reading directory\n");
-            return -1;
-        }
-        printf("Directory listing for %s:\n", cwd);
-        for (int i = 0; i < n; i++) {
-            printf("  %s\n", ents[i].d_name);
-        }
+        return cmd_ls(0, NULL);
     } else if (argc >= 3 && strcmp(argv[1], "system") == 0
                          && strcmp(argv[2], "status") == 0) {
         int pid = getpid();
@@ -338,20 +349,28 @@ static int cmd_show(int argc, char *argv[])
     return 0;
 }
 
+/* ── MOSIX English: go to / cd ──────────────────────────────────────────── */
 static int cmd_go(int argc, char *argv[])
 {
-    if (argc < 3) {
-        printf("go to where? Usage: go to <path>\n");
+    const char *path = NULL;
+    if (argc >= 3 && strcmp(argv[1], "to") == 0) {
+        path = argv[2];
+    } else if (argc >= 2) {
+        path = argv[1];
+    }
+    if (!path) {
+        printf("Usage: go to <path>  or  cd <path>\n");
         return -1;
     }
-    if (chdir(argv[2]) == 0) {
+    if (chdir(path) == 0) {
         return 0;
     } else {
-        printf("chdir: %s: no such directory\n", argv[2]);
+        printf("chdir: %s: no such directory\n", path);
         return -1;
     }
 }
 
+/* ── MOSIX English: run / exec ───────────────────────────────────────────── */
 static int cmd_run(int argc, char *argv[])
 {
     if (argc < 2) {
@@ -360,7 +379,7 @@ static int cmd_run(int argc, char *argv[])
     }
 
     int pid = getpid();
-    printf("ZirvShell: execute '%s' as PID %d...\n", argv[0], pid);
+    printf("ZirvShell: execute '%s' as PID %d...\n", argv[1], pid);
 
     char *exec_argv[] = { argv[1], NULL };
     execve(argv[1], exec_argv, NULL);
@@ -369,11 +388,153 @@ static int cmd_run(int argc, char *argv[])
     return -1;
 }
 
+/* ── MOSIX English: create ───────────────────────────────────────────────── */
+static int cmd_create(int argc, char *argv[])
+{
+    if (argc < 3) {
+        printf("create what? Usage: create file <path>  or  create folder <path>\n");
+        return -1;
+    }
+    if (strcmp(argv[1], "file") == 0) {
+        int fd = open(argv[2], O_CREAT);
+        if (fd < 0) {
+            printf("create file: could not create '%s'\n", argv[2]);
+            return -1;
+        }
+        close(fd);
+        return 0;
+    } else if (strcmp(argv[1], "folder") == 0) {
+        if (mkdir(argv[2]) == 0) {
+            return 0;
+        } else {
+            printf("create folder: could not create '%s'\n", argv[2]);
+            return -1;
+        }
+    } else {
+        printf("Unknown type '%s'. Use 'file' or 'folder'.\n", argv[1]);
+        return -1;
+    }
+}
+
+/* ── MOSIX English: delete / rm / rmdir / unlink ─────────────────────────── */
+static int cmd_delete(int argc, char *argv[])
+{
+    if (argc < 3) {
+        printf("delete what? Usage: delete file <path>  or  delete folder <path>\n");
+        return -1;
+    }
+    if (strcmp(argv[1], "file") == 0) {
+        if (unlink(argv[2]) == 0) {
+            return 0;
+        } else {
+            printf("delete file: could not delete '%s'\n", argv[2]);
+            return -1;
+        }
+    } else if (strcmp(argv[1], "folder") == 0) {
+        if (rmdir(argv[2]) == 0) {
+            return 0;
+        } else {
+            printf("delete folder: could not delete '%s' (directory may not be empty)\n", argv[2]);
+            return -1;
+        }
+    } else {
+        printf("Unknown type '%s'. Use 'file' or 'folder'.\n", argv[1]);
+        return -1;
+    }
+}
+
+/* ── rename / mv ─────────────────────────────────────────────────────────── */
+static int cmd_rename(int argc, char *argv[])
+{
+    if (argc < 3) {
+        printf("Usage: rename <old> <new>\n");
+        return -1;
+    }
+    if (rename(argv[1], argv[2]) == 0) {
+        return 0;
+    } else {
+        printf("rename: could not rename '%s' to '%s'\n", argv[1], argv[2]);
+        return -1;
+    }
+}
+
+/* ── copy / cp ───────────────────────────────────────────────────────────── */
+static int cmd_copy(int argc, char *argv[])
+{
+    (void)argv;
+    if (argc < 3) {
+        printf("Usage: copy <src> <dst>\n");
+        return -1;
+    }
+    printf("copy: not yet implemented\n");
+    return -1;
+}
+
+/* ── mkdir POSIX ─────────────────────────────────────────────────────────── */
+static int cmd_mkdir(int argc, char *argv[])
+{
+    if (argc < 2) {
+        printf("Usage: mkdir <path>\n");
+        return -1;
+    }
+    if (mkdir(argv[1]) == 0) {
+        return 0;
+    } else {
+        printf("mkdir: could not create '%s'\n", argv[1]);
+        return -1;
+    }
+}
+
+/* ── rm / rmdir / unlink POSIX ──────────────────────────────────────────── */
+static int cmd_rm(int argc, char *argv[])
+{
+    if (argc < 2) {
+        printf("Usage: rm <path>\n");
+        return -1;
+    }
+    if (unlink(argv[1]) == 0) {
+        return 0;
+    } else {
+        printf("rm: could not remove '%s'\n", argv[1]);
+        return -1;
+    }
+}
+
+static int cmd_rmdir(int argc, char *argv[])
+{
+    if (argc < 2) {
+        printf("Usage: rmdir <path>\n");
+        return -1;
+    }
+    if (rmdir(argv[1]) == 0) {
+        return 0;
+    } else {
+        printf("rmdir: could not remove '%s' (directory may not be empty)\n", argv[1]);
+        return -1;
+    }
+}
+
+/* ── mv POSIX ────────────────────────────────────────────────────────────── */
+static int cmd_mv(int argc, char *argv[])
+{
+    if (argc < 3) {
+        printf("Usage: mv <old> <new>\n");
+        return -1;
+    }
+    if (rename(argv[1], argv[2]) == 0) {
+        return 0;
+    } else {
+        printf("mv: could not rename '%s' to '%s'\n", argv[1], argv[2]);
+        return -1;
+    }
+}
+
 int main(void)
 {
-    printf("ZirvShell v1.0 (MOSIX Compliant)\n");
+    printf("ZirvShell v2.0 (MOSIX Compliant)\n");
     printf("Lead Developer: Gautham Nair\n");
     printf("Type 'help' for MOSIX English syntax commands.\n");
+    printf("POSIX/UNIX users: all familiar commands (ls, cd, mkdir, rm, mv, ...) also work.\n");
 
     char cmd[MAX_CMD_LEN];
     char *argv[MAX_ARGS];
@@ -390,7 +551,50 @@ int main(void)
         int argc = parse_args(cmd, argv, MAX_ARGS);
         if (argc == 0) continue;
 
-        if (strcmp(argv[0], "help") == 0 || strcmp(argv[0], "help me please") == 0) {
+        /* ── Multi-word commands (must be checked before argv[0] only) ──── */
+
+        /* "help me please" */
+        if (argc >= 3 && strcmp(argv[0], "help") == 0
+                      && strcmp(argv[1], "me") == 0
+                      && strcmp(argv[2], "please") == 0) {
+            cmd_help();
+
+        /* "clear the screen" */
+        } else if (argc >= 3 && strcmp(argv[0], "clear") == 0
+                             && strcmp(argv[1], "the") == 0
+                             && strcmp(argv[2], "screen") == 0) {
+            cmd_clear();
+
+        /* "go to <path>" */
+        } else if (strcmp(argv[0], "go") == 0) {
+            cmd_go(argc, argv);
+
+        /* "run <binary>" */
+        } else if (strcmp(argv[0], "run") == 0) {
+            cmd_run(argc, argv);
+
+        /* "create file/folder <path>" */
+        } else if (strcmp(argv[0], "create") == 0) {
+            cmd_create(argc, argv);
+
+        /* "delete file/folder <path>" */
+        } else if (strcmp(argv[0], "delete") == 0) {
+            cmd_delete(argc, argv);
+
+        /* "show files" / "show system status" */
+        } else if (strcmp(argv[0], "show") == 0) {
+            cmd_show(argc, argv);
+
+        /* "copy <src> <dst>" */
+        } else if (strcmp(argv[0], "copy") == 0) {
+            cmd_copy(argc, argv);
+
+        /* "rename <old> <new>" */
+        } else if (strcmp(argv[0], "rename") == 0) {
+            cmd_rename(argc, argv);
+
+        /* ── Simple POSIX + English aliases ─────────────────────────────── */
+        } else if (strcmp(argv[0], "help") == 0) {
             cmd_help();
         } else if (strcmp(argv[0], "echo") == 0 || strcmp(argv[0], "say") == 0) {
             cmd_echo(argc, argv);
@@ -398,7 +602,7 @@ int main(void)
             cmd_pwd();
         } else if (strcmp(argv[0], "uname") == 0) {
             cmd_uname();
-        } else if (strcmp(argv[0], "clear") == 0 || strcmp(argv[0], "clear the screen") == 0) {
+        } else if (strcmp(argv[0], "clear") == 0) {
             cmd_clear();
         } else if (strcmp(argv[0], "exit") == 0) {
             printf("ZirvShell: exiting...\n");
@@ -406,7 +610,7 @@ int main(void)
         } else if (strcmp(argv[0], "whoami") == 0) {
             cmd_whoami();
         } else if (strcmp(argv[0], "ls") == 0 || strcmp(argv[0], "list") == 0) {
-            cmd_ls();
+            cmd_ls(argc, argv);
         } else if (strcmp(argv[0], "cat") == 0 || strcmp(argv[0], "display") == 0) {
             cmd_cat(argc, argv);
         } else if (strcmp(argv[0], "date") == 0) {
@@ -423,12 +627,20 @@ int main(void)
             cmd_shutdown();
         } else if (strcmp(argv[0], "suspend") == 0) {
             cmd_suspend();
-        } else if (strcmp(argv[0], "show") == 0) {
-            cmd_show(argc, argv);
-        } else if (strcmp(argv[0], "go") == 0 || strcmp(argv[0], "cd") == 0) {
+        } else if (strcmp(argv[0], "cd") == 0) {
             cmd_go(argc, argv);
-        } else if (strcmp(argv[0], "run") == 0 || strcmp(argv[0], "exec") == 0) {
+        } else if (strcmp(argv[0], "exec") == 0) {
             cmd_run(argc, argv);
+        } else if (strcmp(argv[0], "mkdir") == 0) {
+            cmd_mkdir(argc, argv);
+        } else if (strcmp(argv[0], "rm") == 0) {
+            cmd_rm(argc, argv);
+        } else if (strcmp(argv[0], "rmdir") == 0) {
+            cmd_rmdir(argc, argv);
+        } else if (strcmp(argv[0], "mv") == 0) {
+            cmd_mv(argc, argv);
+        } else if (strcmp(argv[0], "cp") == 0) {
+            cmd_copy(argc, argv);
         } else {
             printf("ZirvShell: '%s': unknown command. Type 'help'.\n", argv[0]);
         }
